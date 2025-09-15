@@ -1,0 +1,16 @@
+# Core RAG & LLM
+langchain>=0.1.0
+langchain-community>=0.0.100
+langchain-chroma>=0.2.6
+langchain-openai>=0.3.33
+chromadb>=0.3.24
+openai>=1.0.0
+
+# Document ingestion
+PyPDF2>=3.0.0
+python-docx>=0.8.11
+marker-pdf>=1.0.0
+tiktoken>=0.11.0
+
+# Logging & environment
+python-dotenv>=1.0.0
