@@ -8,7 +8,7 @@ llm = GPT5Nano()
 
 SYSTEM_INSTRUCTIONS = (
     "Eres un asistente pedagógico. Usa el contexto recuperado para responder precisa y concisamente. "
-    "Si no hay información en el contexto relevante, indica que no lo sabes en vez de inventar."
+    "Si no hay información en el contexto relevante, indica que no lo sabes."
 )
 
 def build_prompt(context_docs, question: str) -> str:
@@ -24,6 +24,6 @@ def build_prompt(context_docs, question: str) -> str:
 def answer_with_rag(question: str, k: int = None) -> Dict[str, Any]:
     docs = get_relevant_docs(question, k=k)
     prompt = build_prompt(docs, question)
-    logger.debug("Sending prompt to LLM (length approx %d chars)" % len(prompt))
+    # logger.debug("Sending prompt to LLM (length approx %d chars)" % len(prompt))
     answer = llm.generate(prompt)
     return {"answer": answer, "source_documents": docs}

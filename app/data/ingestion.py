@@ -41,7 +41,6 @@ def load_file_to_text(path: str, use_marker_ocr: bool = True) -> str:
         raw_text = read_pdf(path)
         # Si el texto es muy corto o parece vacío, o si forzamos OCR:
         if use_marker_ocr:
-            # criterio simple: digamos si menos de N caracteres
             if len(raw_text.strip()) < 500:  
                 logger.info(f"PDF {path} parece tener poco texto (" \
                             f"{len(raw_text)} chars). Usando OCR de Marker.")
@@ -49,7 +48,6 @@ def load_file_to_text(path: str, use_marker_ocr: bool = True) -> str:
                     return extract_text_with_marker(path, force_ocr=True)
                 except Exception as e:
                     logger.exception(f"Marker OCR falló en {path}: {e}")
-                    # fallback al texto crudo
                     return raw_text
         return raw_text
 
@@ -63,7 +61,6 @@ def load_file_to_text(path: str, use_marker_ocr: bool = True) -> str:
 def ingest_files(paths: List[str], collection_name: str = "study_collection", persist: bool = True):
     def clean_text(text):
         return text.encode('utf-8', 'ignore').decode('utf-8')
-    logger.info("Starting ingestion pipeline with OCR-marker support...")
     emb = EmbeddingClient()
     vectordb = Chroma(persist_directory=config.CHROMA_PERSIST_DIR, embedding_function=emb._client)
     documents = []
@@ -71,19 +68,14 @@ def ingest_files(paths: List[str], collection_name: str = "study_collection", pe
         try:
             text = load_file_to_text(path, use_marker_ocr=True)
             if not text or len(text.strip()) == 0:
-                logger.warning(f"No se extrajo texto de {path}")
                 continue
             chunks = chunk_text(text, chunk_size_chars=config.MAX_CHUNK_SIZE)
             for i, ch in enumerate(chunks):
                 ch_clean = clean_text(ch)
                 metadata = {"source": os.path.basename(path), "chunk": i}
                 documents.append(Document(page_content=ch_clean, metadata=metadata))
-            logger.info(f"Ingested {len(chunks)} chunks from {path}")
         except Exception as e:
-            logger.exception(f"Failed to ingest {path}: {e}")
+            pass
 
     if documents:
         vectordb.add_documents(documents)
-        logger.info(f"Added {len(documents)} documents to Chroma at {config.CHROMA_PERSIST_DIR}")
-    else:
-        logger.warning("No documents were created from ingestion.")

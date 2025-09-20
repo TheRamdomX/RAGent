@@ -9,7 +9,7 @@ class ConversationManager:
 
     def handle_query(self, query: str, use_rag_override: bool = None):
         use_rag = self.use_rag if use_rag_override is None else use_rag_override
-        logger.info(f"Handling query. use_rag={use_rag}")
+        # logger.info(f"Handling query. use_rag={use_rag}")
         self.history.append({"role": "user", "text": query})
         if use_rag:
             res = answer_with_rag(query)
