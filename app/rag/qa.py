@@ -1,14 +1,14 @@
 from app.rag.retriever import get_relevant_docs
-from app.models.llm import GPT5Nano
+from app.models.llm import Agent
 from app.utils import config
 from app.utils.logger import logger
 from typing import Dict, Any, Tuple
 
-llm = GPT5Nano()
+llm = Agent()
 
 SYSTEM_INSTRUCTIONS = (
     "Eres un asistente pedagógico. Usa el contexto recuperado para responder precisa y concisamente. "
-    "Si no hay información en el contexto relevante, indica que no lo sabes."
+    "Si no hay información en el contexto relevante, solo indica que no hay información."
 )
 
 def build_prompt(context_docs, question: str) -> str:
@@ -24,6 +24,5 @@ def build_prompt(context_docs, question: str) -> str:
 def answer_with_rag(question: str, k: int = None) -> Dict[str, Any]:
     docs = get_relevant_docs(question, k=k)
     prompt = build_prompt(docs, question)
-    # logger.debug("Sending prompt to LLM (length approx %d chars)" % len(prompt))
     answer = llm.generate(prompt)
     return {"answer": answer, "source_documents": docs}

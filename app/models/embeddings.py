@@ -3,14 +3,12 @@ from app.utils import config
 from app.utils.logger import logger
 import os
 
-# Ensure environment variable for OpenAI
 os.environ["OPENAI_API_KEY"] = config.OPENAI_API_KEY
 
 class EmbeddingClient:
     def __init__(self, model_name: str = config.EMBEDDING_MODEL):
         self.model_name = model_name
         self._client = OpenAIEmbeddings(model=self.model_name)
-    # logger.debug(f"EmbeddingClient initialized with model {self.model_name}")
 
     def embed(self, texts):
         """

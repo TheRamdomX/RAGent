@@ -14,6 +14,5 @@ def get_relevant_docs(query: str, k: int = None) -> List[Document]:
     k = k or config.DEFAULT_TOP_K
     vectordb = get_vectorstore()
     retriever = vectordb.as_retriever(search_kwargs={"k": k})
-    # Use invoke method to avoid deprecation warning
     docs = retriever.invoke(query)
     return docs
