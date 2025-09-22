@@ -7,3 +7,14 @@ venv/
 # Ignorar cachés de Python
 __pycache__/
 **/__pycache__/
+
+# Ignorar configuraciones de GitHub
+.github/
+
+#ignorar pruebas unitarias
+.pytest_cache/
+tests/
+
+#Ignorar datos locales
+chroma_db/
+files/
