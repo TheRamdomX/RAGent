@@ -80,25 +80,35 @@ flowchart TD
 ## Uso básico (CLI)
 
 - Ingesta de archivos:
-```
+
+```bash
     python main.py ingest docs/algebra.pdf docs/notes.docx 
 ```
+
 - Modo chat:
-```
+
+```bash
     python main.py chat
 ```
+
 - Ingesta + chat en un solo paso:
-```
+
+```bash
     python main.py run file.pdf 
 ```
+
 - Listar archivos del RAG
-```
+
+```bash
     python main.py list
 ```
+
 - Eliminar archivos del RAG
-```
+
+```bash
     python main.py delete file.pdf 
 ```
+
 ## Configuración (variables de entorno)
 
 RAGent se configura principalmente mediante variables de entorno (usando `.env`). Las más relevantes:
@@ -109,20 +119,23 @@ RAGent se configura principalmente mediante variables de entorno (usando `.env`)
 - `LLM_MODEL` — Modelo LLM para generación (por defecto `gpt-4.1-nano`).
 - `DEFAULT_TOP_K` — Número por defecto de documentos a recuperar en búsquedas.
 
-- OCR y extracción de PDFs:
-    - `FORCE_MARKER_OCR` — Si es `true`, el sistema intentará usar Marker OCR en PDFs cuando la extracción nativa devuelva poco texto.
-    - `MARKER_OCR_THRESHOLD` — Umbral en caracteres para decidir cuando la extracción nativa se considera "pobre" (por defecto 500).
+### OCR y extracción de PDFs
 
-- Chunking y deduplicación:
-    - `CHUNK_DEFAULT_SIZE` — Tamaño por defecto del chunk en caracteres (por defecto 1000).
-    - `CHUNK_DEFAULT_OVERLAP` — Solapamiento entre chunks en caracteres (por defecto 200).
-    - `MIN_CHUNK_CHARS` — Longitud mínima aceptable para un chunk (por defecto 50).
-    - `DEDUP_SIM_THRESHOLD` — Umbral de similitud para marcar near-duplicates usando embeddings (0..1, por defecto 0.9).
+- `FORCE_MARKER_OCR` — Si es `true`, el sistema intentará usar Marker OCR en PDFs cuando la extracción nativa devuelva poco texto.
+- `MARKER_OCR_THRESHOLD` — Umbral en caracteres para decidir cuando la extracción nativa se considera "pobre" (por defecto 500).
 
-- LLM / Agentes:
-    - `LLM_TEMPERATURE` — Controla creatividad/determinismo del LLM (0.0 a 1.0, por defecto 0.7).
-    - `LLM_MAX_COMPLETION_TOKENS` — Tokens máximos por respuesta del LLM.
-    - `BUDGET_CALLS_PER_QUERY` — Límite de llamadas a herramientas por consulta en agentes (por defecto 5).
+### Chunking y deduplicación
+
+- `CHUNK_DEFAULT_SIZE` — Tamaño por defecto del chunk en caracteres (por defecto 1000).
+- `CHUNK_DEFAULT_OVERLAP` — Solapamiento entre chunks en caracteres (por defecto 200).
+- `MIN_CHUNK_CHARS` — Longitud mínima aceptable para un chunk (por defecto 50).
+- `DEDUP_SIM_THRESHOLD` — Umbral de similitud para marcar near-duplicates usando embeddings (0..1, por defecto 0.9).
+
+### LLM / Agentes
+
+- `LLM_TEMPERATURE` — Controla creatividad/determinismo del LLM (0.0 a 1.0, por defecto 0.7).
+- `LLM_MAX_COMPLETION_TOKENS` — Tokens máximos por respuesta del LLM.
+- `BUDGET_CALLS_PER_QUERY` — Límite de llamadas a herramientas por consulta en agentes (por defecto 5).
 
 ## Notas sobre OCR
 

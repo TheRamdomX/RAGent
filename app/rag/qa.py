@@ -73,8 +73,8 @@ def build_prompt(context_docs, question: str) -> str:
     )
     return prompt
 
-def answer_with_rag(question: str, k: int = None) -> Dict[str, Any]:
-    docs = get_relevant_docs(question, k=k)
+def answer_with_rag(question: str, k: int = None, collection_name: str = None) -> Dict[str, Any]:
+    docs = get_relevant_docs(question, k=k, collection_name=collection_name)
     prompt = build_prompt(docs, question)
     encoding = tiktoken.encoding_for_model(config.LLM_MODEL)
     tokens_used = len(encoding.encode(prompt))

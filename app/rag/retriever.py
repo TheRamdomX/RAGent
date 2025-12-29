@@ -6,14 +6,19 @@ from langchain.schema import Document
 from langchain_chroma import Chroma
 from math import sqrt
 
-def get_vectorstore():
+def get_vectorstore(collection_name: str = None):
+    collection_name = collection_name or config.DEFAULT_COLLECTION_NAME
     emb = EmbeddingClient()
-    vectordb = Chroma(persist_directory=config.CHROMA_PERSIST_DIR, embedding_function=emb._client)
+    vectordb = Chroma(
+        collection_name=collection_name,
+        persist_directory=config.CHROMA_PERSIST_DIR,
+        embedding_function=emb._client
+    )
     return vectordb
 
-def get_relevant_docs(query: str, k: int = None) -> List[Document]:
+def get_relevant_docs(query: str, k: int = None, collection_name: str = None) -> List[Document]:
     k = k or config.DEFAULT_TOP_K
-    vectordb = get_vectorstore()
+    vectordb = get_vectorstore(collection_name=collection_name)
     top_n = config.RERANK_TOP_K if config.RERANK_ENABLED else k
     retriever = vectordb.as_retriever(search_kwargs={"k": top_n})
 

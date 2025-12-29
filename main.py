@@ -10,17 +10,17 @@ import os
 app = typer.Typer()
 
 @app.command()
-def ingest(paths: list[str], collection: str = "study_collection", dry_run: bool = False):
+def ingest(paths: list[str], collection: str = "study_collection", dry_run: bool = False, force_ocr: bool = None):
 
-        docs = ingest_files(paths, collection_name=collection, dry_run=dry_run)
+        docs = ingest_files(paths, collection_name=collection, dry_run=dry_run, force_ocr=force_ocr)
         if dry_run:
             print(f"Dry-run: {len(docs)} chunks would be created/added from provided paths")
 
 @app.command()
-def chat(use_rag: bool = True):
+def chat(use_rag: bool = True, collection: str = "study_collection"):
     
-    bot = Chatbot(use_rag=use_rag)
-    print("Modo chat. Escribe 'exit' para salir.")
+    bot = Chatbot(use_rag=use_rag, collection_name=collection)
+    print(f"Modo chat (collection: {collection}). Escribe 'exit' para salir.")
     while True:
         q = input("Tú> ").strip()
         if q.lower() in ("exit", "quit", "salir"):
@@ -40,10 +40,10 @@ def chat(use_rag: bool = True):
         print("\n---\n")
 
 @app.command()
-def run(paths: list[str] = typer.Argument(None), collection: str = "study_collection", use_rag: bool = True, dry_run: bool = False):
+def run(paths: list[str] = typer.Argument(None), collection: str = "study_collection", use_rag: bool = True, dry_run: bool = False, force_ocr: bool = None):
 
     if paths:
-        docs = ingest_files(paths, collection_name=collection, dry_run=dry_run)
+        docs = ingest_files(paths, collection_name=collection, dry_run=dry_run, force_ocr=force_ocr)
         if dry_run:
             print(f"Dry-run: {len(docs)} chunks would be created/added from provided paths")
     else:
@@ -51,13 +51,13 @@ def run(paths: list[str] = typer.Argument(None), collection: str = "study_collec
             print("No existe base de datos y no se entregaron archivos. Ingresa archivos primero con 'ingest'.")
             raise typer.Exit(code=1)
 
-    chat(use_rag=use_rag)
+    chat(use_rag=use_rag, collection=collection)
 
 
 @app.command()
-def delete(targets: list[str] = typer.Argument(..., help="Paths to source files (e.g. files/maze.pdf) or document ids to delete"), ids: str = typer.Option(None, help="Comma-separated document ids to delete")):
+def delete(targets: list[str] = typer.Argument(..., help="Paths to source files (e.g. files/maze.pdf) or document ids to delete"), ids: str = typer.Option(None, help="Comma-separated document ids to delete"), collection: str = typer.Option("study_collection", help="Collection name to delete from")):
 
-    vs = get_vectorstore()
+    vs = get_vectorstore(collection_name=collection)
 
     ids_to_delete = []
 
@@ -100,8 +100,8 @@ def delete(targets: list[str] = typer.Argument(..., help="Paths to source files 
 
 
 @app.command("list")
-def list_files(a: bool = typer.Option(False, help="Show first ids per source")):
-    vs = get_vectorstore()
+def list_files(a: bool = typer.Option(False, help="Show first ids per source"), collection: str = typer.Option("study_collection", help="Collection name to list")):
+    vs = get_vectorstore(collection_name=collection)
     data = vs.get()
     ids = data.get('ids', []) or []
     metadatas = data.get('metadatas', []) or []

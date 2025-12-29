@@ -36,8 +36,9 @@ def read_txt(path: str) -> str:
     with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
-def load_file_to_text(path: str, use_marker_ocr: bool = True) -> str:
+def load_file_to_text(path: str, force_ocr: bool = None) -> str:
     ext = os.path.splitext(path)[1].lower()
+    use_marker_ocr = config.FORCE_MARKER_OCR if force_ocr is None else force_ocr
 
     if ext == ".pdf":
         raw_text = read_pdf(path)
@@ -59,19 +60,23 @@ def load_file_to_text(path: str, use_marker_ocr: bool = True) -> str:
     else:
         raise ValueError(f"Unsupported file extension: {ext}")
 
-def ingest_files(paths: List[str], collection_name: str = None, persist: bool = None, dry_run: bool = False, dedup_threshold: float = None):
+def ingest_files(paths: List[str], collection_name: str = None, persist: bool = None, dry_run: bool = False, dedup_threshold: float = None, force_ocr: bool = None):
     def clean_text(text):
         return text.encode('utf-8', 'ignore').decode('utf-8')
-    emb = EmbeddingClient()
-    vectordb = Chroma(persist_directory=config.CHROMA_PERSIST_DIR, embedding_function=emb._client)
     collection_name = collection_name or config.DEFAULT_COLLECTION_NAME
+    emb = EmbeddingClient()
+    vectordb = Chroma(
+        collection_name=collection_name,
+        persist_directory=config.CHROMA_PERSIST_DIR,
+        embedding_function=emb._client
+    )
     persist = config.DEFAULT_PERSIST if persist is None else persist
     dedup_threshold = config.DEDUP_SIM_THRESHOLD if dedup_threshold is None else dedup_threshold
     documents = []
     seen_hashes = set()
     seen_embeddings = []
     for path in paths:
-        text = load_file_to_text(path, use_marker_ocr=config.FORCE_MARKER_OCR)
+        text = load_file_to_text(path, force_ocr=force_ocr)
         if isinstance(text, list):
             combined_text = "\n".join([p or "" for p in text])
             if not combined_text.strip():
