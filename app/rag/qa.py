@@ -2,8 +2,9 @@ from app.rag.retriever import get_relevant_docs, get_vectorstore
 from app.models.llm import Agent
 from app.utils import config
 from app.utils.logger import logger
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, List, Set
 import tiktoken
+import re
 
 llm = Agent()
 
@@ -12,6 +13,103 @@ SYSTEM_INSTRUCTIONS = (
     "Si no hay información en el contexto, indica explícitamente 'No disponible en el contexto' y no inventes detalles."
     "Puedes hacer inferencias simples solo si están claramente apoyadas por el contexto; marca cualquier información adicional como 'INFO_ADICIONAL'."
 )
+
+# Extensión de archivo soportada para detectar en la pregunta del usuario
+FILE_EXTENSIONS = {".pdf"}
+
+
+def extract_mentioned_files(question: str, available_sources: Set[str]) -> List[str]:
+    """
+    Detecta si el usuario menciona explícitamente archivos en su pregunta.
+    Busca patrones como:
+    - Nombres de archivo con extensión (ej: "homl.pdf")
+    - Nombres parciales que coincidan con fuentes disponibles
+    
+    Args:
+        question: La pregunta del usuario
+        available_sources: Set de nombres de fuentes disponibles en la collection
+    
+    Returns:
+        Lista de nombres de archivos detectados (normalizados a minúsculas)
+    """
+    mentioned = []
+    question_lower = question.lower()
+    
+    # Patrón 1: Buscar nombres de archivo con extensión explícita
+    # Matches: homl.pdf, mi_documento.pdf, archivo-v2.pdf, etc.
+    file_pattern = r'[\w\-\.]+(?:' + '|'.join(re.escape(ext) for ext in FILE_EXTENSIONS) + r')'
+    explicit_files = re.findall(file_pattern, question_lower)
+    mentioned.extend(explicit_files)
+    
+    # Patrón 2: Buscar coincidencias parciales con fuentes disponibles
+    # Si el usuario dice "en el libro homl" y existe "homl.pdf", lo detectamos
+    for source in available_sources:
+        source_lower = source.lower()
+        # Obtener nombre base sin extensión
+        base_name = re.sub(r'\.[^.]+$', '', source_lower)
+        
+        # Buscar si el nombre base aparece en la pregunta
+        # Usamos word boundaries para evitar falsos positivos
+        if base_name and len(base_name) > 2:  # Ignorar nombres muy cortos
+            pattern = r'\b' + re.escape(base_name) + r'\b'
+            if re.search(pattern, question_lower):
+                mentioned.append(source_lower)
+    
+    # Patrón 3: Detectar frases como "en el archivo X", "del documento X", "según X"
+    context_patterns = [
+        r'(?:en|del|según|from|in)\s+(?:el\s+)?(?:archivo|documento|libro|pdf|file)\s+["\']?([\w\-\.]+)["\']?',
+        r'(?:archivo|documento|libro|pdf|file)\s+["\']?([\w\-\.]+)["\']?',
+    ]
+    for pattern in context_patterns:
+        matches = re.findall(pattern, question_lower)
+        for match in matches:
+            # Verificar si coincide con alguna fuente disponible
+            for source in available_sources:
+                if match in source.lower() or source.lower().startswith(match):
+                    mentioned.append(source.lower())
+                    break
+    
+    # Eliminar duplicados manteniendo orden
+    seen = set()
+    unique_mentioned = []
+    for f in mentioned:
+        if f not in seen:
+            seen.add(f)
+            unique_mentioned.append(f)
+    
+    return unique_mentioned
+
+
+def prioritize_docs_by_source(context_docs: List, files_focus: List[str]) -> List:
+    """
+    Reordena los documentos priorizando aquellos cuya fuente está en files_focus.
+    Los documentos prioritarios van primero, seguidos del resto.
+    
+    Args:
+        context_docs: Lista de documentos recuperados
+        files_focus: Lista de nombres de archivo a priorizar (en minúsculas)
+    
+    Returns:
+        Lista de documentos reordenada
+    """
+    if not files_focus:
+        return context_docs
+    
+    focus_set = set(f.lower() for f in files_focus)
+    prioritized = []
+    others = []
+    
+    for d in context_docs:
+        meta = d.metadata if hasattr(d, "metadata") else {}
+        src = (meta.get("source") or "").lower()
+        # Clasificar: si la fuente está en el conjunto de foco, va a prioritized
+        if src in focus_set:
+            prioritized.append(d)
+        else:
+            others.append(d)
+    
+    logger.info(f"Priorización de documentos: {len(prioritized)} prioritarios, {len(others)} otros")
+    return prioritized + others
 
 def build_prompt(context_docs, question: str) -> str:
     max_model_tokens = config.MAX_MODEL_TOKENS
@@ -74,11 +172,29 @@ def build_prompt(context_docs, question: str) -> str:
     return prompt
 
 def answer_with_rag(question: str, k: int = None, collection_name: str = None) -> Dict[str, Any]:
+    # Obtener documentos relevantes
     docs = get_relevant_docs(question, k=k, collection_name=collection_name)
+    
+    # Extraer las fuentes disponibles de los documentos recuperados
+    available_sources = set()
+    for d in docs:
+        meta = d.metadata if hasattr(d, "metadata") else {}
+        src = meta.get("source")
+        if src:
+            available_sources.add(src)
+    
+    # Detectar si el usuario menciona archivos específicos
+    mentioned_files = extract_mentioned_files(question, available_sources)
+    
+    if mentioned_files:
+        logger.info(f"Archivos mencionados detectados: {mentioned_files}")
+        # Priorizar documentos de los archivos mencionados
+        docs = prioritize_docs_by_source(docs, mentioned_files)
+    
     prompt = build_prompt(docs, question)
     encoding = tiktoken.encoding_for_model(config.LLM_MODEL)
     tokens_used = len(encoding.encode(prompt))
 
     answer = llm.generate(prompt)
-    return {"answer": answer, "source_documents": docs, "tokens_used": tokens_used}
+    return {"answer": answer, "source_documents": docs, "tokens_used": tokens_used, "files_focus": mentioned_files}
 

@@ -8,7 +8,6 @@ openai>=1.0.0
 
 # Document ingestion
 PyPDF2>=3.0.0
-python-docx>=0.8.11
 marker-pdf>=1.0.0
 tiktoken>=0.11.0
 

@@ -11,7 +11,6 @@ from langchain_chroma import Chroma
 from langchain.schema import Document
 
 from PyPDF2 import PdfReader
-import docx
 
 
 from app.data.marker import extract_text_with_marker
@@ -28,37 +27,25 @@ def read_pdf(path: str) -> str:
     else:
         return [p.strip() for p in text]
 
-def read_docx(path: str) -> str:
-    doc = docx.Document(path)
-    return "\n".join([p.text for p in doc.paragraphs])
-
-def read_txt(path: str) -> str:
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
 
 def load_file_to_text(path: str, force_ocr: bool = None) -> str:
     ext = os.path.splitext(path)[1].lower()
     use_marker_ocr = config.FORCE_MARKER_OCR if force_ocr is None else force_ocr
 
-    if ext == ".pdf":
-        raw_text = read_pdf(path)
-        if use_marker_ocr:
-            joined = "\n".join([p or "" for p in raw_text]) if isinstance(raw_text, list) else (raw_text or "")
-            if len(joined) < config.MARKER_OCR_THRESHOLD:
-                ocr_result = extract_text_with_marker(path, force_ocr=True)
-                if isinstance(ocr_result, list):
-                    return ocr_result
-                if '\f' in ocr_result:
-                    return [p for p in ocr_result.split('\f')]
-                return [p.strip() for p in ocr_result.split('\n\n')]
-        return raw_text
+    if ext != ".pdf":
+        raise ValueError(f"Solo se soportan archivos PDF. Extensión recibida: {ext}")
 
-    elif ext in [".docx", ".doc"]:
-        return read_docx(path)
-    elif ext in [".txt", ".md"]:
-        return read_txt(path)
-    else:
-        raise ValueError(f"Unsupported file extension: {ext}")
+    raw_text = read_pdf(path)
+    if use_marker_ocr:
+        joined = "\n".join([p or "" for p in raw_text]) if isinstance(raw_text, list) else (raw_text or "")
+        if len(joined) < config.MARKER_OCR_THRESHOLD:
+            ocr_result = extract_text_with_marker(path, force_ocr=True)
+            if isinstance(ocr_result, list):
+                return ocr_result
+            if '\f' in ocr_result:
+                return [p for p in ocr_result.split('\f')]
+            return [p.strip() for p in ocr_result.split('\n\n')]
+    return raw_text
 
 def ingest_files(paths: List[str], collection_name: str = None, persist: bool = None, dry_run: bool = False, dedup_threshold: float = None, force_ocr: bool = None):
     def clean_text(text):
