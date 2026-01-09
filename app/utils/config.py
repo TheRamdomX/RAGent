@@ -73,3 +73,22 @@ BUDGET_CALLS_PER_QUERY: int = int(os.getenv("BUDGET_CALLS_PER_QUERY", "5"))
 
 # Limita tokens consumidos por herramientas en una consulta (0 = sin límite).
 TOKEN_BUDGET_PER_QUERY: int = int(os.getenv("TOKEN_BUDGET_PER_QUERY", "0"))
+
+# Knowledge Graph (RDF/SPARQL)
+# Tipo de almacén de grafos: "local" (RDFLib) o "fuseki" (Apache Jena)
+GRAPH_STORE_TYPE: str = os.getenv("GRAPH_STORE_TYPE", "local")
+
+# Ruta al archivo TTL para el grafo local
+GRAPH_LOCAL_PATH: str = os.getenv("GRAPH_LOCAL_PATH", "./knowledge_graph.ttl")
+
+# URL del servidor Apache Jena Fuseki (si GRAPH_STORE_TYPE=fuseki)
+FUSEKI_URL: str = os.getenv("FUSEKI_URL", "http://localhost:3030")
+
+# Nombre del dataset en Fuseki
+FUSEKI_DATASET: str = os.getenv("FUSEKI_DATASET", "ragent")
+
+# Habilitar extracción automática de relaciones durante ingesta
+GRAPH_EXTRACT_ON_INGEST: bool = os.getenv("GRAPH_EXTRACT_ON_INGEST", "false").lower() in ("1", "true", "yes")
+
+# Habilitar búsqueda híbrida (grafo + vector) en consultas
+GRAPH_HYBRID_SEARCH: bool = os.getenv("GRAPH_HYBRID_SEARCH", "true").lower() in ("1", "true", "yes")

@@ -1,0 +1,184 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rag:  <http://ragent.local/ontology#> .
+
+# =============================================================================
+# RAGent Knowledge Graph Ontology
+# Vocabulario para modelar relaciones entre documentos académicos,
+# evaluaciones, conceptos y chunks de texto.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Clases principales
+# -----------------------------------------------------------------------------
+
+rag:Chunk a owl:Class ;
+    rdfs:label "Chunk"@es ;
+    rdfs:comment "Fragmento de texto extraído de un documento PDF."@es .
+
+rag:Documento a owl:Class ;
+    rdfs:label "Documento"@es ;
+    rdfs:comment "Archivo PDF fuente de información."@es .
+
+rag:Ramo a owl:Class ;
+    rdfs:label "Ramo"@es ;
+    rdfs:comment "Asignatura o curso académico."@es .
+
+rag:Evaluacion a owl:Class ;
+    rdfs:label "Evaluación"@es ;
+    rdfs:comment "Instancia de evaluación (prueba, tarea, proyecto, etc.)."@es .
+
+rag:Concepto a owl:Class ;
+    rdfs:label "Concepto"@es ;
+    rdfs:comment "Tema, idea o conocimiento específico."@es .
+
+rag:Persona a owl:Class ;
+    rdfs:label "Persona"@es ;
+    rdfs:comment "Autor, profesor o persona mencionada."@es .
+
+rag:Fecha a owl:Class ;
+    rdfs:label "Fecha"@es ;
+    rdfs:comment "Fecha relevante (entrega, evaluación, etc.)."@es .
+
+# -----------------------------------------------------------------------------
+# Subclases de Evaluacion
+# -----------------------------------------------------------------------------
+
+rag:Prueba a owl:Class ;
+    rdfs:subClassOf rag:Evaluacion ;
+    rdfs:label "Prueba"@es ;
+    rdfs:comment "Evaluación tipo prueba escrita u oral."@es .
+
+rag:Tarea a owl:Class ;
+    rdfs:subClassOf rag:Evaluacion ;
+    rdfs:label "Tarea"@es ;
+    rdfs:comment "Trabajo o tarea asignada."@es .
+
+rag:Proyecto a owl:Class ;
+    rdfs:subClassOf rag:Evaluacion ;
+    rdfs:label "Proyecto"@es ;
+    rdfs:comment "Proyecto de curso o investigación."@es .
+
+rag:Examen a owl:Class ;
+    rdfs:subClassOf rag:Evaluacion ;
+    rdfs:label "Examen"@es ;
+    rdfs:comment "Examen final o parcial."@es .
+
+# -----------------------------------------------------------------------------
+# Propiedades de objeto (relaciones entre entidades)
+# -----------------------------------------------------------------------------
+
+rag:menciona a owl:ObjectProperty ;
+    rdfs:label "menciona"@es ;
+    rdfs:comment "El chunk menciona un concepto, evaluación o entidad."@es ;
+    rdfs:domain rag:Chunk ;
+    rdfs:range [ a owl:Class ; owl:unionOf (rag:Concepto rag:Evaluacion rag:Ramo rag:Persona) ] .
+
+rag:perteneceA a owl:ObjectProperty ;
+    rdfs:label "pertenece a"@es ;
+    rdfs:comment "El chunk pertenece a un documento."@es ;
+    rdfs:domain rag:Chunk ;
+    rdfs:range rag:Documento .
+
+rag:evalua a owl:ObjectProperty ;
+    rdfs:label "evalúa"@es ;
+    rdfs:comment "La evaluación evalúa uno o más conceptos."@es ;
+    rdfs:domain rag:Evaluacion ;
+    rdfs:range rag:Concepto .
+
+rag:esParteDe a owl:ObjectProperty ;
+    rdfs:label "es parte de"@es ;
+    rdfs:comment "La evaluación es parte de un ramo."@es ;
+    rdfs:domain rag:Evaluacion ;
+    rdfs:range rag:Ramo .
+
+rag:requiere a owl:ObjectProperty ;
+    rdfs:label "requiere"@es ;
+    rdfs:comment "Un concepto requiere conocer otro concepto previo."@es ;
+    rdfs:domain rag:Concepto ;
+    rdfs:range rag:Concepto .
+
+rag:relacionadoCon a owl:ObjectProperty ;
+    rdfs:label "relacionado con"@es ;
+    rdfs:comment "Relación genérica entre dos entidades."@es .
+
+rag:autor a owl:ObjectProperty ;
+    rdfs:label "autor"@es ;
+    rdfs:comment "El documento tiene un autor."@es ;
+    rdfs:domain rag:Documento ;
+    rdfs:range rag:Persona .
+
+rag:profesor a owl:ObjectProperty ;
+    rdfs:label "profesor"@es ;
+    rdfs:comment "El ramo tiene un profesor asociado."@es ;
+    rdfs:domain rag:Ramo ;
+    rdfs:range rag:Persona .
+
+rag:tieneFecha a owl:ObjectProperty ;
+    rdfs:label "tiene fecha"@es ;
+    rdfs:comment "La evaluación tiene una fecha asociada."@es ;
+    rdfs:domain rag:Evaluacion ;
+    rdfs:range rag:Fecha .
+
+# -----------------------------------------------------------------------------
+# Propiedades de datos (atributos literales)
+# -----------------------------------------------------------------------------
+
+rag:texto a owl:DatatypeProperty ;
+    rdfs:label "texto"@es ;
+    rdfs:comment "Contenido textual del chunk."@es ;
+    rdfs:domain rag:Chunk ;
+    rdfs:range xsd:string .
+
+rag:chunkId a owl:DatatypeProperty ;
+    rdfs:label "chunk ID"@es ;
+    rdfs:comment "Identificador único del chunk en ChromaDB."@es ;
+    rdfs:domain rag:Chunk ;
+    rdfs:range xsd:string .
+
+rag:ponderacion a owl:DatatypeProperty ;
+    rdfs:label "ponderación"@es ;
+    rdfs:comment "Peso porcentual de la evaluación en la nota final."@es ;
+    rdfs:domain rag:Evaluacion ;
+    rdfs:range xsd:decimal .
+
+rag:tipo a owl:DatatypeProperty ;
+    rdfs:label "tipo"@es ;
+    rdfs:comment "Tipo específico de la entidad (ej: 'Prueba escrita')."@es ;
+    rdfs:range xsd:string .
+
+rag:nombre a owl:DatatypeProperty ;
+    rdfs:label "nombre"@es ;
+    rdfs:comment "Nombre o título de la entidad."@es ;
+    rdfs:range xsd:string .
+
+rag:codigo a owl:DatatypeProperty ;
+    rdfs:label "código"@es ;
+    rdfs:comment "Código identificador (ej: código de ramo)."@es ;
+    rdfs:domain rag:Ramo ;
+    rdfs:range xsd:string .
+
+rag:fuente a owl:DatatypeProperty ;
+    rdfs:label "fuente"@es ;
+    rdfs:comment "Nombre del archivo PDF de origen."@es ;
+    rdfs:domain rag:Documento ;
+    rdfs:range xsd:string .
+
+rag:pagina a owl:DatatypeProperty ;
+    rdfs:label "página"@es ;
+    rdfs:comment "Número de página en el documento."@es ;
+    rdfs:domain rag:Chunk ;
+    rdfs:range xsd:integer .
+
+rag:fechaValor a owl:DatatypeProperty ;
+    rdfs:label "valor de fecha"@es ;
+    rdfs:comment "Valor de la fecha en formato ISO."@es ;
+    rdfs:domain rag:Fecha ;
+    rdfs:range xsd:date .
+
+rag:descripcion a owl:DatatypeProperty ;
+    rdfs:label "descripción"@es ;
+    rdfs:comment "Descripción textual de la entidad."@es ;
+    rdfs:range xsd:string .

@@ -11,5 +11,9 @@ PyPDF2>=3.0.0
 marker-pdf>=1.0.0
 tiktoken>=0.11.0
 
+# Knowledge Graph (RDF/SPARQL)
+rdflib>=7.0.0
+requests>=2.31.0
+
 # Logging & environment
 python-dotenv>=1.0.0

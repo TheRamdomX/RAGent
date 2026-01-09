@@ -171,8 +171,97 @@ def build_prompt(context_docs, question: str) -> str:
     )
     return prompt
 
-def answer_with_rag(question: str, k: int = None, collection_name: str = None) -> Dict[str, Any]:
-    # Obtener documentos relevantes
+
+def build_hybrid_prompt(hybrid_context: str, question: str) -> str:
+    """
+    Construye un prompt usando contexto híbrido (grafo + vector).
+    
+    Args:
+        hybrid_context: Contexto combinado del HybridRetriever.
+        question: Pregunta del usuario.
+    
+    Returns:
+        Prompt formateado para el LLM.
+    """
+    formatting = (
+        "Instrucciones de formato:\n"
+        "- Usa la información estructurada (del grafo) como hechos verificados.\n"
+        "- Usa el contexto textual para detalles y explicaciones.\n"
+        "- Si la información no está disponible, indica 'No disponible en el contexto'.\n"
+        "- Al final, incluye una sección 'FUENTES' con las referencias utilizadas.\n"
+    )
+    
+    prompt = (
+        f"{SYSTEM_INSTRUCTIONS}\n\n"
+        f"{hybrid_context}\n\n"
+        f"{formatting}\n"
+        f"Pregunta del usuario:\n{question}\n\n"
+        f"Respuesta (en español, estructurada y con ejemplos si aplica):"
+    )
+    return prompt
+
+
+def answer_with_rag(question: str, k: int = None, collection_name: str = None, use_hybrid: bool = None) -> Dict[str, Any]:
+    """
+    Responde una pregunta usando RAG, opcionalmente con búsqueda híbrida.
+    
+    Args:
+        question: Pregunta del usuario.
+        k: Número de documentos a recuperar.
+        collection_name: Nombre de la colección.
+        use_hybrid: Usar búsqueda híbrida (grafo + vector). 
+                   Por defecto usa config.GRAPH_HYBRID_SEARCH.
+    
+    Returns:
+        Diccionario con answer, source_documents, tokens_used, etc.
+    """
+    use_hybrid = config.GRAPH_HYBRID_SEARCH if use_hybrid is None else use_hybrid
+    
+    # Intentar búsqueda híbrida si está habilitada
+    if use_hybrid:
+        try:
+            from app.knowledge_graph.hybrid_retriever import HybridRetriever
+            from app.knowledge_graph.graph_store import GraphStore
+            
+            # Abrir grafo
+            graph_store = GraphStore()
+            graph_store.open()
+            
+            # Crear recuperador híbrido
+            hybrid = HybridRetriever(
+                graph_store=graph_store,
+                collection_name=collection_name
+            )
+            
+            # Recuperar
+            result = hybrid.retrieve(question, k=k)
+            
+            # Cerrar grafo
+            graph_store.close()
+            
+            if result.has_structural or result.vector_docs:
+                # Usar prompt híbrido
+                prompt = build_hybrid_prompt(result.combined_context, question)
+                encoding = tiktoken.encoding_for_model(config.LLM_MODEL)
+                tokens_used = len(encoding.encode(prompt))
+                
+                answer = llm.generate(prompt)
+                
+                return {
+                    "answer": answer,
+                    "source_documents": result.enriched_docs,
+                    "tokens_used": tokens_used,
+                    "files_focus": [],
+                    "query_type": result.query_type,
+                    "has_structural": result.has_structural,
+                    "sources_used": result.sources_used
+                }
+        except ImportError:
+            logger.debug("Módulo de grafo no disponible, usando búsqueda vectorial estándar")
+        except Exception as e:
+            logger.warning(f"Error en búsqueda híbrida, fallback a vectorial: {e}")
+    
+    # Fallback: búsqueda vectorial estándar
     docs = get_relevant_docs(question, k=k, collection_name=collection_name)
     
     # Extraer las fuentes disponibles de los documentos recuperados
@@ -196,5 +285,13 @@ def answer_with_rag(question: str, k: int = None, collection_name: str = None) -
     tokens_used = len(encoding.encode(prompt))
 
     answer = llm.generate(prompt)
-    return {"answer": answer, "source_documents": docs, "tokens_used": tokens_used, "files_focus": mentioned_files}
+    return {
+        "answer": answer,
+        "source_documents": docs,
+        "tokens_used": tokens_used,
+        "files_focus": mentioned_files,
+        "query_type": "vector_only",
+        "has_structural": False,
+        "sources_used": ["chroma_db"]
+    }
 

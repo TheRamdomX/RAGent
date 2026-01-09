@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 from app.data.chunking import chunk_text
 from app.data.chunking import __dict__ as _chunk_mod
 from app.models.embeddings import EmbeddingClient
@@ -47,10 +47,37 @@ def load_file_to_text(path: str, force_ocr: bool = None) -> str:
             return [p.strip() for p in ocr_result.split('\n\n')]
     return raw_text
 
-def ingest_files(paths: List[str], collection_name: str = None, persist: bool = None, dry_run: bool = False, dedup_threshold: float = None, force_ocr: bool = None):
+def ingest_files(
+    paths: List[str],
+    collection_name: str = None,
+    persist: bool = None,
+    dry_run: bool = False,
+    dedup_threshold: float = None,
+    force_ocr: bool = None,
+    extract_graph: bool = None
+):
+    """
+    Ingiere archivos PDF en ChromaDB y opcionalmente extrae relaciones al grafo RDF.
+    
+    Args:
+        paths: Lista de rutas a archivos PDF.
+        collection_name: Nombre de la colección ChromaDB.
+        persist: Si persistir en disco.
+        dry_run: Si solo simular sin guardar.
+        dedup_threshold: Umbral de similitud para deduplicación.
+        force_ocr: Forzar uso de OCR para extracción.
+        extract_graph: Extraer relaciones al grafo de conocimiento.
+                      Por defecto usa config.GRAPH_EXTRACT_ON_INGEST.
+    
+    Returns:
+        Lista de documentos procesados.
+    """
     def clean_text(text):
         return text.encode('utf-8', 'ignore').decode('utf-8')
+    
     collection_name = collection_name or config.DEFAULT_COLLECTION_NAME
+    extract_graph = config.GRAPH_EXTRACT_ON_INGEST if extract_graph is None else extract_graph
+    
     emb = EmbeddingClient()
     vectordb = Chroma(
         collection_name=collection_name,
@@ -59,9 +86,26 @@ def ingest_files(paths: List[str], collection_name: str = None, persist: bool = 
     )
     persist = config.DEFAULT_PERSIST if persist is None else persist
     dedup_threshold = config.DEDUP_SIM_THRESHOLD if dedup_threshold is None else dedup_threshold
+    
+    # Inicializar extractor de grafo si está habilitado
+    graph_store = None
+    relation_extractor = None
+    if extract_graph and not dry_run:
+        try:
+            from app.knowledge_graph.graph_store import GraphStore
+            from app.knowledge_graph.extract_relations import RelationExtractor
+            graph_store = GraphStore().open()
+            relation_extractor = RelationExtractor()
+            logger.info("Extracción de grafo habilitada")
+        except ImportError as e:
+            logger.warning(f"No se pudo inicializar el grafo de conocimiento: {e}")
+            extract_graph = False
+    
     documents = []
+    chunks_for_graph = []  # Chunks a procesar para el grafo
     seen_hashes = set()
     seen_embeddings = []
+    
     for path in paths:
         text = load_file_to_text(path, force_ocr=force_ocr)
         if isinstance(text, list):
@@ -74,8 +118,8 @@ def ingest_files(paths: List[str], collection_name: str = None, persist: bool = 
                 logger.info(f"No text extracted from {path}, skipping.")
                 continue
 
-    chunks = chunk_text(text, chunk_size_chars=config.CHUNK_DEFAULT_SIZE, chunk_overlap=config.CHUNK_DEFAULT_OVERLAP)
-    for i, ch in enumerate(chunks):
+        chunks = chunk_text(text, chunk_size_chars=config.CHUNK_DEFAULT_SIZE, chunk_overlap=config.CHUNK_DEFAULT_OVERLAP)
+        for i, ch in enumerate(chunks):
             ch_dict = ch if isinstance(ch, dict) else {"text": ch}
             ch_text = ch_dict.get("text") or ""
             ch_clean = clean_text(ch_text)
@@ -115,7 +159,21 @@ def ingest_files(paths: List[str], collection_name: str = None, persist: bool = 
                 metadata.update({"page_start": ch_dict.get("page_start"), "page_end": ch_dict.get("page_end")})
             if ch_dict.get("char_start") is not None:
                 metadata.update({"char_start": ch_dict.get("char_start"), "char_end": ch_dict.get("char_end")})
+            
+            # Generar ID único para el chunk
+            chunk_id = f"chunk_{os.path.basename(path).replace('.', '_')}_{i}"
+            metadata["chunk_id"] = chunk_id
+            
             documents.append(Document(page_content=ch_clean, metadata=metadata))
+            
+            # Preparar chunk para extracción de grafo
+            if extract_graph:
+                chunks_for_graph.append({
+                    "text": ch_clean,
+                    "chunk_id": chunk_id,
+                    "source": os.path.basename(path),
+                    "page": ch_dict.get("page_start")
+                })
 
     if documents:
         if dry_run:
@@ -123,6 +181,21 @@ def ingest_files(paths: List[str], collection_name: str = None, persist: bool = 
         else:
             vectordb.add_documents(documents)
             logger.info(f"Ingested {len(documents)} documents into collection '{collection_name}'")
+            
+            # Extraer relaciones al grafo de conocimiento
+            if extract_graph and relation_extractor and graph_store and chunks_for_graph:
+                logger.info(f"Extrayendo relaciones de {len(chunks_for_graph)} chunks al grafo...")
+                try:
+                    processed, triples = relation_extractor.extract_batch(
+                        chunks_for_graph,
+                        store=graph_store
+                    )
+                    logger.info(f"Grafo actualizado: {processed} chunks → {triples} tripletas")
+                except Exception as e:
+                    logger.error(f"Error extrayendo relaciones: {e}")
+                finally:
+                    graph_store.close()
     else:
         logger.info("No documents to add after processing (dedup/filter may have removed all chunks)")
+    
     return documents
